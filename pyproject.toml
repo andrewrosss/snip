@@ -5,6 +5,12 @@ description = "Crop tabular data files"
 authors = ["Andrew Ross <andrew.ross.mail@gmail.com>"]
 license = "MIT"
 
+readme = "README.md"
+
+homepage = "https://github.com/andrewrosss/snip"
+repository = "https://github.com/andrewrosss/snip"
+documentation = "https://github.com/andrewrosss/snip"
+
 [tool.poetry.dependencies]
 python = "^3.8"
 matplotlib = "^3.5.1"
