@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "snip"
+name = "snip-snip"
 version = "0.1.0"
 description = "Crop tabular data files"
 authors = ["Andrew Ross <andrew.ross.mail@gmail.com>"]
@@ -7,9 +7,9 @@ license = "MIT"
 
 readme = "README.md"
 
-homepage = "https://github.com/andrewrosss/snip"
-repository = "https://github.com/andrewrosss/snip"
-documentation = "https://github.com/andrewrosss/snip"
+homepage = "https://github.com/andrewrosss/snip-snip"
+repository = "https://github.com/andrewrosss/snip-snip"
+documentation = "https://github.com/andrewrosss/snip-snip"
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -24,7 +24,7 @@ bump2version = "^1.0.1"
 pre-commit = "^2.17.0"
 
 [tool.poetry.scripts]
-snip = "snip:main"
+snip = "snip_snip:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
