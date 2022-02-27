@@ -112,7 +112,7 @@ def create_parser(
 
 def handler(args: argparse.Namespace) -> int:
     in_file: TextIOWrapper = args.in_file
-    header: bool = args.header
+    has_header: bool = args.header
     delimiter: str = args.delimiter
     plot_x: int = args.plot_x
     plot_y: int = args.plot_y
@@ -121,11 +121,11 @@ def handler(args: argparse.Namespace) -> int:
     crop_end: Any = coerce(args.crop_end)
     out_file: TextIOWrapper = args.out_file
 
-    records = read_file(in_file, delimiter, header)
+    header, records = read_file(in_file, delimiter, has_header)
 
     if crop_start is not None:
         cropped_records = crop(records, crop_col, crop_start, crop_end)
-        return write_records(cropped_records, out_file, delimiter)
+        return write_records(cropped_records, out_file, header, delimiter)
     else:
         return plot(records, out_file, plot_x, plot_y)
 
@@ -146,12 +146,13 @@ def coerce(s: str | None) -> Any:
 def read_file(
     file: TextIOWrapper,
     delimiter: str = Defaults.DELIMITER,
-    header: bool = Defaults.HEADER,
-) -> list[list[Any]]:
+    has_header: bool = Defaults.HEADER,
+) -> tuple[list[str] | None, list[list[Any]]]:
+    header = None
     reader = csv.reader(file, delimiter=delimiter)
-    if header:
-        next(reader)
-    return [[coerce(c) for c in row] for row in reader]
+    if has_header:
+        header = next(reader)
+    return header, [[coerce(c) for c in row] for row in reader]
 
 
 def crop(records: list[list[Any]], col: int, start: Any, end: Any) -> list[list[Any]]:
@@ -169,9 +170,12 @@ def crop(records: list[list[Any]], col: int, start: Any, end: Any) -> list[list[
 def write_records(
     records: list[list[str]],
     out_file: TextIOWrapper,
+    header: list[str] | None = None,
     delimiter: str = Defaults.DELIMITER,
 ) -> int:
     writer = csv.writer(out_file, delimiter=delimiter)
+    if header is not None:
+        writer.writerow(header)
     writer.writerows(records)
     return 0
 
