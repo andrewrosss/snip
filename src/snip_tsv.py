@@ -9,7 +9,7 @@ from typing import Any
 import matplotlib.pyplot as plt
 
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 
 COL_DTYPE = {"int": int, "float": float, "str": str}
