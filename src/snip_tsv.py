@@ -5,6 +5,7 @@ import ast
 import csv
 from io import TextIOWrapper
 from typing import Any
+from typing import NamedTuple
 
 import matplotlib.pyplot as plt
 
@@ -121,13 +122,13 @@ def handler(args: argparse.Namespace) -> int:
     crop_end: Any = coerce(args.crop_end)
     out_file: TextIOWrapper = args.out_file
 
-    header, records = read_file(in_file, delimiter, has_header)
+    data = read_file(in_file, delimiter, has_header)
 
     if crop_start is not None:
-        cropped_records = crop(records, crop_col, crop_start, crop_end)
-        return write_records(cropped_records, out_file, header, delimiter)
+        cropped_data = crop(data, crop_col, crop_start, crop_end)
+        return write_records(cropped_data, out_file, delimiter)
     else:
-        return plot(records, out_file, plot_x, plot_y)
+        return plot(data, out_file, plot_x, plot_y)
 
 
 def coerce(s: str | None) -> Any:
@@ -143,52 +144,56 @@ def coerce(s: str | None) -> Any:
         raise
 
 
+class Data(NamedTuple):
+    records: list[list[Any]]
+    header: list[Any] | None = None
+    filename: str | None = None
+
+
 def read_file(
     file: TextIOWrapper,
     delimiter: str = Defaults.DELIMITER,
     has_header: bool = Defaults.HEADER,
-) -> tuple[list[str] | None, list[list[Any]]]:
-    header = None
+) -> Data:
     reader = csv.reader(file, delimiter=delimiter)
-    if has_header:
-        header = next(reader)
-    return header, [[coerce(c) for c in row] for row in reader]
+    header = next(reader) if has_header else None
+    records = [[coerce(c) for c in row] for row in reader]
+    return Data(records, header)
 
 
-def crop(records: list[list[Any]], col: int, start: Any, end: Any) -> list[list[Any]]:
+def crop(data: Data, col: int, start: Any, end: Any) -> Data:
     start_idx: int | None = None
     end_idx: int | None = None
-    for i, record in enumerate(records):
+    for i, record in enumerate(data.records):
         if record[col] == start and start_idx is None:
             start_idx = i
         if end is not None and record[col] == end and end_idx is None:
             end_idx = i
 
-    return records[start_idx:end_idx]
+    return Data(data.records[start_idx:end_idx], data.header, data.filename)
 
 
 def write_records(
-    records: list[list[str]],
+    data: Data,
     out_file: TextIOWrapper,
-    header: list[str] | None = None,
     delimiter: str = Defaults.DELIMITER,
 ) -> int:
     writer = csv.writer(out_file, delimiter=delimiter)
-    if header is not None:
-        writer.writerow(header)
-    writer.writerows(records)
+    if data.header is not None:
+        writer.writerow(data.header)
+    writer.writerows(data.records)
     return 0
 
 
 def plot(
-    records: list[list[str]],
+    data: Data,
     out_file: TextIOWrapper,
     plot_x: int = Defaults.PLOT_X,
     plot_y: int = Defaults.PLOT_Y,
 ) -> int:
     fig, ax = plt.subplots()
-    x = [r[plot_x] for r in records]
-    y = [r[plot_y] for r in records]
+    x = [r[plot_x] for r in data.records]
+    y = [r[plot_y] for r in data.records]
     ax.plot(x, y)
 
     if out_file.name in ("<stdout>", "<stderr>"):
