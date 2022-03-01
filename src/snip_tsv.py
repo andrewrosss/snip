@@ -26,6 +26,25 @@ class Defaults:
     OUT_FILE = "-"
 
 
+class CropOptions(NamedTuple):
+    col: int
+    start: Any
+    end: Any
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace):
+        return cls(args.crop_col, coerce(args.crop_start), coerce(args.crop_end))
+
+
+class PlotOptions(NamedTuple):
+    x: int = Defaults.PLOT_X
+    y: int = Defaults.PLOT_Y
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace):
+        return cls(args.plot_x, args.plot_y)
+
+
 def main() -> int:
     parser = create_parser()
     args = parser.parse_args()
@@ -115,20 +134,17 @@ def handler(args: argparse.Namespace) -> int:
     in_file: TextIOWrapper = args.in_file
     has_header: bool = args.header
     delimiter: str = args.delimiter
-    plot_x: int = args.plot_x
-    plot_y: int = args.plot_y
-    crop_col: int = args.crop_col
-    crop_start: Any = coerce(args.crop_start)
-    crop_end: Any = coerce(args.crop_end)
+    popts = PlotOptions.from_namespace(args)
+    copts = CropOptions.from_namespace(args)
     out_file: TextIOWrapper = args.out_file
 
     data = read_file(in_file, delimiter, has_header)
 
-    if crop_start is not None:
-        cropped_data = crop(data, crop_col, crop_start, crop_end)
+    if copts.start is not None:
+        cropped_data = crop(data, copts)
         return write_records(cropped_data, out_file, delimiter)
     else:
-        return plot(data, out_file, plot_x, plot_y)
+        return plot(data, out_file, popts)
 
 
 def coerce(s: str | None) -> Any:
@@ -161,13 +177,13 @@ def read_file(
     return Data(records, header)
 
 
-def crop(data: Data, col: int, start: Any, end: Any) -> Data:
+def crop(data: Data, opts: CropOptions) -> Data:
     start_idx: int | None = None
     end_idx: int | None = None
     for i, record in enumerate(data.records):
-        if record[col] == start and start_idx is None:
+        if record[opts.col] == opts.start and start_idx is None:
             start_idx = i
-        if end is not None and record[col] == end and end_idx is None:
+        if opts.end is not None and record[opts.col] == opts.end and end_idx is None:
             end_idx = i
 
     return Data(data.records[start_idx:end_idx], data.header, data.filename)
@@ -185,15 +201,10 @@ def write_records(
     return 0
 
 
-def plot(
-    data: Data,
-    out_file: TextIOWrapper,
-    plot_x: int = Defaults.PLOT_X,
-    plot_y: int = Defaults.PLOT_Y,
-) -> int:
+def plot(data: Data, out_file: TextIOWrapper, opts: PlotOptions) -> int:
     fig, ax = plt.subplots()
-    x = [r[plot_x] for r in data.records]
-    y = [r[plot_y] for r in data.records]
+    x = [r[opts.x] for r in data.records]
+    y = [r[opts.y] for r in data.records]
     ax.plot(x, y)
 
     if out_file.name in ("<stdout>", "<stderr>"):
