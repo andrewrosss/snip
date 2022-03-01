@@ -8,6 +8,8 @@ from typing import Any
 from typing import NamedTuple
 
 import matplotlib.pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 
 __version__ = "0.3.0"
@@ -24,25 +26,6 @@ class Defaults:
     PLOT_Y = 1
     CROP_COL = 0
     OUT_FILE = "-"
-
-
-class CropOptions(NamedTuple):
-    col: int
-    start: Any
-    end: Any
-
-    @classmethod
-    def from_namespace(cls, args: argparse.Namespace):
-        return cls(args.crop_col, coerce(args.crop_start), coerce(args.crop_end))
-
-
-class PlotOptions(NamedTuple):
-    x: int = Defaults.PLOT_X
-    y: int = Defaults.PLOT_Y
-
-    @classmethod
-    def from_namespace(cls, args: argparse.Namespace):
-        return cls(args.plot_x, args.plot_y)
 
 
 def main() -> int:
@@ -144,7 +127,27 @@ def handler(args: argparse.Namespace) -> int:
         cropped_data = crop(data, copts)
         return write_records(cropped_data, out_file, delimiter)
     else:
-        return plot(data, out_file, popts)
+        fig, ax = plot(data, popts)
+        return write_figure(fig, ax, out_file)
+
+
+class CropOptions(NamedTuple):
+    col: int
+    start: Any
+    end: Any
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace):
+        return cls(args.crop_col, coerce(args.crop_start), coerce(args.crop_end))
+
+
+class PlotOptions(NamedTuple):
+    x: int = Defaults.PLOT_X
+    y: int = Defaults.PLOT_Y
+
+    @classmethod
+    def from_namespace(cls, args: argparse.Namespace):
+        return cls(args.plot_x, args.plot_y)
 
 
 def coerce(s: str | None) -> Any:
@@ -164,6 +167,7 @@ class Data(NamedTuple):
     records: list[list[Any]]
     header: list[Any] | None = None
     filename: str | None = None
+    is_numeric: list[bool] | None = None
 
 
 def read_file(
@@ -174,7 +178,18 @@ def read_file(
     reader = csv.reader(file, delimiter=delimiter)
     header = next(reader) if has_header else None
     records = [[coerce(c) for c in row] for row in reader]
-    return Data(records, header)
+    is_numeric = _determine_numeric_columns(records)
+    return Data(records, header, file.name, is_numeric)
+
+
+def _determine_numeric_columns(records: list[list[Any]]) -> list[bool]:
+    is_numeric = [True for _ in records[0]]
+    for record in records:
+        is_numeric = [
+            is_num and isinstance(entry, (int, float))
+            for is_num, entry in zip(is_numeric, record)
+        ]
+    return is_numeric
 
 
 def crop(data: Data, opts: CropOptions) -> Data:
@@ -198,15 +213,20 @@ def write_records(
     if data.header is not None:
         writer.writerow(data.header)
     writer.writerows(data.records)
+
     return 0
 
 
-def plot(data: Data, out_file: TextIOWrapper, opts: PlotOptions) -> int:
+def plot(data: Data, opts: PlotOptions) -> tuple[Figure, Axes]:
     fig, ax = plt.subplots()
     x = [r[opts.x] for r in data.records]
     y = [r[opts.y] for r in data.records]
     ax.plot(x, y)
 
+    return fig, ax
+
+
+def write_figure(fig: Figure, ax: Axes, out_file: TextIOWrapper) -> int:
     if out_file.name in ("<stdout>", "<stderr>"):
         plt.show()
     else:
