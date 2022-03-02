@@ -5,6 +5,7 @@ import ast
 import csv
 from io import TextIOWrapper
 from typing import Any
+from typing import cast
 from typing import NamedTuple
 
 import matplotlib.pyplot as plt
@@ -195,13 +196,58 @@ def _determine_numeric_columns(records: list[list[Any]]) -> list[bool]:
 def crop(data: Data, opts: CropOptions) -> Data:
     start_idx: int | None = None
     end_idx: int | None = None
+
+    if data.is_numeric and data.is_numeric[opts.col]:
+        start_idx, end_idx = find_endpoints_closest(data, opts)
+    else:
+        start_idx, end_idx = find_endpoints_exact(data, opts)
+
+    return Data(data.records[start_idx:end_idx], data.header, data.filename)
+
+
+def find_endpoints_exact(
+    data: Data,
+    opts: CropOptions,
+) -> tuple[int | None, int | None]:
+    start_idx: int | None = None
+    end_idx: int | None = None
     for i, record in enumerate(data.records):
         if record[opts.col] == opts.start and start_idx is None:
             start_idx = i
         if opts.end is not None and record[opts.col] == opts.end and end_idx is None:
             end_idx = i
 
-    return Data(data.records[start_idx:end_idx], data.header, data.filename)
+    return start_idx, end_idx
+
+
+def find_endpoints_closest(
+    data: Data,
+    opts: CropOptions,
+) -> tuple[int | None, int | None]:
+    start_idx = _argmin(
+        [abs(cast(float, r[opts.col] - opts.start)) for r in data.records],
+    )
+    end_idx = None
+    if opts.end is not None:
+        end_idx = start_idx + _argmin(
+            [
+                abs(cast(float, r[opts.col] - opts.end))
+                for r in data.records[start_idx:]
+            ],
+        )
+    return start_idx, end_idx
+
+
+def _argmin(values: list[int | float]) -> int:
+    pair = min((v, i) for i, v in enumerate(values))
+    return pair[1]
+
+
+[4, 3.5, 8, 9]
+
+3
+
+[1, 0.5, 5, 6]
 
 
 def write_records(
