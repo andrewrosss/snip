@@ -120,11 +120,11 @@ def handler(args: argparse.Namespace) -> int:
     in_file: TextIOWrapper = args.in_file
     has_header: bool = args.header
     delimiter: str = args.delimiter
+    data = read_file(in_file, delimiter, has_header)
+
     popts = PlotOptions.from_namespace(args)
     copts = CropOptions.from_namespace(args)
     out_file: TextIOWrapper = args.out_file
-
-    data = read_file(in_file, delimiter, has_header)
 
     if copts.start is not None:
         cropped_data = crop(data, copts)
@@ -183,7 +183,7 @@ def coerce(s: str | None) -> Any:
 
 class Data(NamedTuple):
     records: list[list[Any]]
-    header: list[Any] | None = None
+    header: list[str] | None = None
     filename: str | None = None
     is_numeric: list[bool] | None = None
 
@@ -258,13 +258,6 @@ def find_endpoints_closest(
 def _argmin(values: list[int | float]) -> int:
     pair = min((v, i) for i, v in enumerate(values))
     return pair[1]
-
-
-[4, 3.5, 8, 9]
-
-3
-
-[1, 0.5, 5, 6]
 
 
 def write_records(
