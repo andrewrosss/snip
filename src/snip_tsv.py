@@ -24,7 +24,7 @@ CROP_END_REGEX = re.compile(r":(\+|-)?\d+(\.\d+)?$")
 class Defaults:
     IN_FILE = "-"
     DELIMITER = "\t"
-    HEADER = False
+    HAS_HEADER = False
     PLOT_X = 0
     PLOT_Y = 1
     CROP_COL = 0
@@ -57,7 +57,7 @@ def create_parser(
     _parser.add_argument("-v", "--version", action="version", version=__version__)
     _parser.add_argument(
         "--header",
-        default=Defaults.HEADER,
+        default=Defaults.HAS_HEADER,
         action="store_true",
         help="When set assume the first row to be a header row. By default, "
         "no header row is assumed.",
@@ -191,7 +191,7 @@ class Data(NamedTuple):
 def read_file(
     file: TextIOWrapper,
     delimiter: str = Defaults.DELIMITER,
-    has_header: bool = Defaults.HEADER,
+    has_header: bool = Defaults.HAS_HEADER,
 ) -> Data:
     reader = csv.reader(file, delimiter=delimiter)
     header = next(reader) if has_header else None
