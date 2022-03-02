@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import re
 from io import TextIOWrapper
 from typing import Any
 from typing import cast
@@ -17,6 +18,7 @@ __version__ = "0.3.0"
 
 
 COL_DTYPE = {"int": int, "float": float, "str": str}
+CROP_END_REGEX = re.compile(r":(\+|-)?\d+(\.\d+)?$")
 
 
 class Defaults:
@@ -139,7 +141,22 @@ class CropOptions(NamedTuple):
 
     @classmethod
     def from_namespace(cls, args: argparse.Namespace):
-        return cls(args.crop_col, coerce(args.crop_start), coerce(args.crop_end))
+        col = args.crop_col
+        start = coerce(args.crop_start)
+        end = cls._parse_endpoint(start, args.crop_end)
+        return cls(col, start, end)
+
+    @staticmethod
+    def _parse_endpoint(start: int | float | None, end: Any):
+        if end is None:
+            return end
+        if re.match(CROP_END_REGEX, end):
+            if not isinstance(start, (int, float)):
+                msg = "Cannot specify relative crop end with non-numeric crop start"
+                raise ValueError(msg)
+            return start + coerce(end[1:])
+        else:
+            return coerce(end)
 
 
 class PlotOptions(NamedTuple):
