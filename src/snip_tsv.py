@@ -134,6 +134,45 @@ def handler(args: argparse.Namespace) -> int:
         return write_figure(fig, ax, out_file)
 
 
+class Data(NamedTuple):
+    records: list[list[Any]]
+    header: list[str] | None = None
+    filename: str | None = None
+    is_numeric: list[bool] | None = None
+
+
+def read_file(
+    file: TextIOWrapper,
+    delimiter: str = Defaults.DELIMITER,
+    has_header: bool = Defaults.HAS_HEADER,
+) -> Data:
+    reader = csv.reader(file, delimiter=delimiter)
+    header = next(reader) if has_header else None
+    records = [[coerce(c) for c in row] for row in reader]
+    is_numeric = _determine_numeric_columns(records)
+    return Data(records, header, file.name, is_numeric)
+
+
+def coerce(s: str | None) -> Any:
+    if s is None:
+        return s
+    try:
+        return ast.literal_eval(s)
+    except SyntaxError:
+        return ast.literal_eval(f"'{s}'")
+    except ValueError:
+        if s.lower() == "nan":
+            return float(s)
+        raise
+
+
+def _determine_numeric_columns(records: list[list[Any]]) -> list[bool]:
+    numeric = [True for _ in records[0]]
+    for record in records:
+        numeric = [n and isinstance(e, (int, float)) for n, e in zip(numeric, record)]
+    return numeric
+
+
 class CropOptions(NamedTuple):
     col: int
     start: Any
@@ -166,48 +205,6 @@ class PlotOptions(NamedTuple):
     @classmethod
     def from_namespace(cls, args: argparse.Namespace):
         return cls(args.plot_x, args.plot_y)
-
-
-def coerce(s: str | None) -> Any:
-    if s is None:
-        return s
-    try:
-        return ast.literal_eval(s)
-    except SyntaxError:
-        return ast.literal_eval(f"'{s}'")
-    except ValueError:
-        if s.lower() == "nan":
-            return float(s)
-        raise
-
-
-class Data(NamedTuple):
-    records: list[list[Any]]
-    header: list[str] | None = None
-    filename: str | None = None
-    is_numeric: list[bool] | None = None
-
-
-def read_file(
-    file: TextIOWrapper,
-    delimiter: str = Defaults.DELIMITER,
-    has_header: bool = Defaults.HAS_HEADER,
-) -> Data:
-    reader = csv.reader(file, delimiter=delimiter)
-    header = next(reader) if has_header else None
-    records = [[coerce(c) for c in row] for row in reader]
-    is_numeric = _determine_numeric_columns(records)
-    return Data(records, header, file.name, is_numeric)
-
-
-def _determine_numeric_columns(records: list[list[Any]]) -> list[bool]:
-    is_numeric = [True for _ in records[0]]
-    for record in records:
-        is_numeric = [
-            is_num and isinstance(entry, (int, float))
-            for is_num, entry in zip(is_numeric, record)
-        ]
-    return is_numeric
 
 
 def crop(data: Data, opts: CropOptions) -> Data:
