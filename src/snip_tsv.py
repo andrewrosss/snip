@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import ast
 import csv
+import difflib
 import re
 from io import TextIOWrapper
 from typing import Any
@@ -25,9 +26,9 @@ class Defaults:
     IN_FILE = "-"
     DELIMITER = "\t"
     HAS_HEADER = False
-    PLOT_X = 0
-    PLOT_Y = 1
-    CROP_COL = 0
+    PLOT_X = "0"
+    PLOT_Y = "1"
+    CROP_COL = "0"
     OUT_FILE = "-"
 
 
@@ -71,21 +72,18 @@ def create_parser(
     _parser.add_argument(
         "-x",
         "--plot-x",
-        type=int,
         default=Defaults.PLOT_X,
         help="Column to use on the x-axis. A 0-indexed integer. (default: %(default)s)",
     )
     _parser.add_argument(
         "-y",
         "--plot-y",
-        type=int,
         default=Defaults.PLOT_Y,
         help="Column to use on the y-axis. A 0-indexed integer. (default: %(default)s)",
     )
     _parser.add_argument(
         "-c",
         "--crop-col",
-        type=int,
         default=Defaults.CROP_COL,
         help="Column to search in for --crop-start/--crop-end values. A "
         "0-indexed integer. (default: %(default)s)",
@@ -122,8 +120,8 @@ def handler(args: argparse.Namespace) -> int:
     delimiter: str = args.delimiter
     data = read_file(in_file, delimiter, has_header)
 
-    popts = PlotOptions.from_namespace(args)
-    copts = CropOptions.from_namespace(args)
+    popts = PlotOptions.from_namespace(args, data.header)
+    copts = CropOptions.from_namespace(args, data.header)
     out_file: TextIOWrapper = args.out_file
 
     if copts.start is not None:
@@ -148,7 +146,11 @@ def read_file(
 ) -> Data:
     reader = csv.reader(file, delimiter=delimiter)
     header = next(reader) if has_header else None
-    records = [[coerce(c) for c in row] for row in reader]
+    try:
+        records = [[coerce(c) for c in row] for row in reader]
+    except ValueError as e:
+        msg = f"Failed to parse file {file.name}. Did you forget the --header flag?"
+        raise ValueError(msg) from e
     is_numeric = _determine_numeric_columns(records)
     return Data(records, header, file.name, is_numeric)
 
@@ -179,8 +181,8 @@ class CropOptions(NamedTuple):
     end: Any
 
     @classmethod
-    def from_namespace(cls, args: argparse.Namespace):
-        col = args.crop_col
+    def from_namespace(cls, args: argparse.Namespace, header: list[str] | None = None):
+        col = _get_column_index(args.crop_col, header)
         start = coerce(args.crop_start)
         end = cls._parse_endpoint(start, args.crop_end)
         return cls(col, start, end)
@@ -191,7 +193,8 @@ class CropOptions(NamedTuple):
             return end
         if re.match(CROP_END_REGEX, end):
             if not isinstance(start, (int, float)):
-                msg = "Cannot specify relative crop end with non-numeric crop start"
+                msg = f"Cannot specify relative crop end [{end}] "
+                msg += f"with non-numeric crop start [{start}]"
                 raise ValueError(msg)
             return start + coerce(end[1:])
         else:
@@ -199,12 +202,29 @@ class CropOptions(NamedTuple):
 
 
 class PlotOptions(NamedTuple):
-    x: int = Defaults.PLOT_X
-    y: int = Defaults.PLOT_Y
+    x: int = int(Defaults.PLOT_X)
+    y: int = int(Defaults.PLOT_Y)
 
     @classmethod
-    def from_namespace(cls, args: argparse.Namespace):
-        return cls(args.plot_x, args.plot_y)
+    def from_namespace(cls, args: argparse.Namespace, header: list[str] | None = None):
+        plot_x = _get_column_index(args.plot_x, header)
+        plot_y = _get_column_index(args.plot_y, header)
+        return cls(plot_x, plot_y)
+
+
+def _get_column_index(col: str, headings: list[str] | None = None) -> int:
+    _heading_map = {h: i for i, h in enumerate(headings)} if headings else {}
+    if col.isnumeric():
+        return int(col)
+    elif col not in _heading_map:
+        msg = f"Column [{col}] is unknown."
+        matches = difflib.get_close_matches(str(col), _heading_map.keys())
+        if matches:
+            matches_s = ", ".join(matches)
+            msg += f" Did you mean one of: {matches_s}"
+        raise ValueError(msg)
+    else:
+        return _heading_map[col]
 
 
 def crop(data: Data, opts: CropOptions) -> Data:
