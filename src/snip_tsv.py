@@ -4,9 +4,12 @@ import argparse
 import ast
 import csv
 import difflib
+import gzip
 import re
+import sys
 from io import TextIOWrapper
 from typing import Any
+from typing import Callable
 from typing import cast
 from typing import NamedTuple
 
@@ -52,7 +55,7 @@ def create_parser(
 
     _parser.add_argument(
         "in_file",
-        type=argparse.FileType("r"),
+        type=_filetype("r"),
         default=Defaults.IN_FILE,
         help="Input data file. (default: %(default)s)",
     )
@@ -73,45 +76,60 @@ def create_parser(
         help="The delimiter used in the input data file. (default: %(default)r)",
     )
     _parser.add_argument(
+        "-o",
+        "--out-file",
+        type=_filetype("w"),
+        default=Defaults.OUT_FILE,
+        help="File to write the results to (either an image or TSV file. If "
+        "not provided, a matplotlib plot is shown when plotting, and data is "
+        "written to stdout when cropping. (default: %(default)s)",
+    )
+
+    # plot options
+    plot_group = _parser.add_argument_group("plot options")
+    plot_group.add_argument(
         "-x",
         "--plot-x",
         default=Defaults.PLOT_X,
         help="Column to use on the x-axis. A 0-indexed integer or a column "
         "heading string. (default: %(default)s)",
     )
-    _parser.add_argument(
+    plot_group.add_argument(
         "-y",
         "--plot-y",
         default=Defaults.PLOT_Y,
         help="Column to use on the y-axis. A 0-indexed integer or a column "
         "heading string. (default: %(default)s)",
     )
-    _parser.add_argument(
-        "-c",
-        "--crop-col",
-        default=Defaults.CROP_COL,
-        help="Column to search in for --crop-start/--crop-end values. A "
-        "0-indexed integer or a column heading string. (default: %(default)s)",
-    )
-    _parser.add_argument(
+
+    # crop options
+    crop_group = _parser.add_argument_group("crop options")
+    crop_group.add_argument(
         "-s",
-        "--crop-start",
+        "--start",
         help="Start value to use for cropping (inclusive). If the column is "
         "numeric then the row with column entry closest to the given value is used.",
     )
-    _parser.add_argument(
+    crop_group.add_argument(
         "-e",
-        "--crop-end",
+        "--end",
         help="End value to use for cropping (exclusive). If the column is "
         "numeric then the row with column entry closest to the given value "
         "is used. To specify a numeric value relative to --crop-start use "
         "the syntax ':<number>'. Omit this flag to crop from --crop-start to "
         "the end of the file.",
     )
-    pick_omit_group = _parser.add_mutually_exclusive_group()
+    crop_group.add_argument(
+        "-c",
+        "--col",
+        default=Defaults.CROP_COL,
+        help="Column to search in for --crop-start/--crop-end values. A "
+        "0-indexed integer or a column heading string. (default: %(default)s)",
+    )
+    pick_omit_group = crop_group.add_mutually_exclusive_group()
     pick_omit_group.add_argument(
         "-p",
-        "--crop-pick-cols",
+        "--pick",
         type=_parse_col_list,
         default=Defaults.PICK_COLS,
         help="Comma separated list of columns to keep. If specified, only "
@@ -121,7 +139,7 @@ def create_parser(
     )
     pick_omit_group.add_argument(
         "-r",
-        "--crop-omit-cols",
+        "--omit",
         type=_parse_col_list,
         default=Defaults.OMIT_COLS,
         help="Comma separated list of columns to omit. If specified, columns "
@@ -129,19 +147,26 @@ def create_parser(
         "either be column heading strings or 0-indexed integers (intermixing "
         "is allowed).",
     )
-    _parser.add_argument(
-        "-o",
-        "--out-file",
-        type=argparse.FileType("w"),
-        default=Defaults.OUT_FILE,
-        help="File to write the results to (either an image or TSV file. If "
-        "not provided a matplotlib plot is shown when plotting, and data is "
-        "written to stdout when cropping. (default: %(default)s)",
-    )
 
     _parser.set_defaults(handler=handler)
 
     return _parser
+
+
+def _filetype(mode: str) -> Callable[[str | None], TextIOWrapper]:
+    def _f(s: str | None) -> TextIOWrapper:
+        if s is None:
+            raise ValueError("No file specified.")
+        elif s == "-":
+            buffer = sys.stdin.buffer if mode.startswith("r") else sys.stdout.buffer
+            return TextIOWrapper(buffer)
+        elif s.endswith(".gz"):
+            buffer = gzip.open(s, mode=mode)
+            return TextIOWrapper(buffer)  # type: ignore
+        else:
+            return open(s, mode=mode)  # type: ignore
+
+    return _f
 
 
 def _parse_col_list(s: str | None) -> list[str] | None:
@@ -155,8 +180,8 @@ def handler(args: argparse.Namespace) -> int:
     in_file: TextIOWrapper = args.in_file
     has_header: bool = args.header
     delimiter: str = args.delimiter
-    pick: list[str] | None = args.crop_pick_cols
-    omit: list[str] | None = args.crop_omit_cols
+    pick: list[str] | None = args.pick
+    omit: list[str] | None = args.omit
     data = read_file(in_file, delimiter, has_header)
     out_cols = _prepare_out_cols(data, pick, omit)
 
@@ -239,9 +264,9 @@ class CropOptions(NamedTuple):
 
     @classmethod
     def from_namespace(cls, args: argparse.Namespace, header: list[str] | None = None):
-        col = _get_column_index(args.crop_col, header)
-        start = coerce(args.crop_start)
-        end = cls._parse_endpoint(start, args.crop_end)
+        col = _get_column_index(args.col, header)
+        start = coerce(args.start)
+        end = cls._parse_endpoint(start, args.end)
         return cls(col, start, end)
 
     @staticmethod
