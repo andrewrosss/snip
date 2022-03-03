@@ -74,31 +74,37 @@ def create_parser(
         "-x",
         "--plot-x",
         default=Defaults.PLOT_X,
-        help="Column to use on the x-axis. A 0-indexed integer. (default: %(default)s)",
+        help="Column to use on the x-axis. A 0-indexed integer or a column "
+        "heading string. (default: %(default)s)",
     )
     _parser.add_argument(
         "-y",
         "--plot-y",
         default=Defaults.PLOT_Y,
-        help="Column to use on the y-axis. A 0-indexed integer. (default: %(default)s)",
+        help="Column to use on the y-axis. A 0-indexed integer or a column "
+        "heading string. (default: %(default)s)",
     )
     _parser.add_argument(
         "-c",
         "--crop-col",
         default=Defaults.CROP_COL,
         help="Column to search in for --crop-start/--crop-end values. A "
-        "0-indexed integer. (default: %(default)s)",
+        "0-indexed integer or a column heading string. (default: %(default)s)",
     )
     _parser.add_argument(
         "-s",
         "--crop-start",
-        help="Start value to use for cropping (inclusive)",
+        help="Start value to use for cropping (inclusive). If the column is "
+        "numeric then the row with column entry closest to the given value is used.",
     )
     _parser.add_argument(
         "-e",
         "--crop-end",
-        help="End value to use for cropping (exclusive). Omit this flag to "
-        "crop from --crop-start to the end of the file.",
+        help="End value to use for cropping (exclusive). If the column is "
+        "numeric then the row with column entry closest to the given value "
+        "is used. To specify a numeric value relative to --crop-start use "
+        "the syntax ':<number>'. Omit this flag to crop from --crop-start to "
+        "the end of the file.",
     )
     _parser.add_argument(
         "-o",
