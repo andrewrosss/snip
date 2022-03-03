@@ -57,6 +57,7 @@ def create_parser(
 
     _parser.add_argument("-v", "--version", action="version", version=__version__)
     _parser.add_argument(
+        "-H",
         "--header",
         default=Defaults.HAS_HEADER,
         action="store_true",
