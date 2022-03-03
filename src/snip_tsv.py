@@ -149,7 +149,7 @@ def read_file(
     try:
         records = [[coerce(c) for c in row] for row in reader]
     except ValueError as e:
-        msg = f"Failed to parse file {file.name}. Did you forget the --header flag?"
+        msg = f"Failed to parse file {file.name!r}. Did you forget the --header flag?"
         raise ValueError(msg) from e
     is_numeric = _determine_numeric_columns(records)
     return Data(records, header, file.name, is_numeric)
@@ -193,8 +193,8 @@ class CropOptions(NamedTuple):
             return end
         if re.match(CROP_END_REGEX, end):
             if not isinstance(start, (int, float)):
-                msg = f"Cannot specify relative crop end [{end}] "
-                msg += f"with non-numeric crop start [{start}]"
+                msg = f"Cannot specify relative crop end [{end=}] "
+                msg += f"with non-numeric crop start [{start=}]"
                 raise ValueError(msg)
             return start + coerce(end[1:])
         else:
@@ -217,7 +217,7 @@ def _get_column_index(col: str, headings: list[str] | None = None) -> int:
     if col.isnumeric():
         return int(col)
     elif col not in _heading_map:
-        msg = f"Column [{col}] is unknown."
+        msg = f"Column {col!r} is unknown."
         matches = difflib.get_close_matches(str(col), _heading_map.keys())
         if matches:
             matches_s = ", ".join(matches)
