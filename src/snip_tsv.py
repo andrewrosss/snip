@@ -15,7 +15,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 
-__version__ = "0.3.0"
+__version__ = "0.4.0"
 
 
 COL_DTYPE = {"int": int, "float": float, "str": str}
