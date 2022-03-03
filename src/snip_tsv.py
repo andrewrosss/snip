@@ -30,6 +30,8 @@ class Defaults:
     PLOT_Y = "1"
     CROP_COL = "0"
     OUT_FILE = "-"
+    PICK_COLS = None
+    OMIT_COLS = None
 
 
 def main() -> int:
@@ -106,6 +108,27 @@ def create_parser(
         "the syntax ':<number>'. Omit this flag to crop from --crop-start to "
         "the end of the file.",
     )
+    pick_omit_group = _parser.add_mutually_exclusive_group()
+    pick_omit_group.add_argument(
+        "-p",
+        "--crop-pick-cols",
+        type=_parse_col_list,
+        default=Defaults.PICK_COLS,
+        help="Comma separated list of columns to keep. If specified, only "
+        "columns in this list will appear in the generated output. Columns "
+        "can either be column heading strings or 0-indexed integers "
+        "(intermixing is allowed). By default all columns are retained.",
+    )
+    pick_omit_group.add_argument(
+        "-r",
+        "--crop-omit-cols",
+        type=_parse_col_list,
+        default=Defaults.OMIT_COLS,
+        help="Comma separated list of columns to omit. If specified, columns "
+        "in this list will be removed from the generated output. Columns can "
+        "either be column heading strings or 0-indexed integers (intermixing "
+        "is allowed).",
+    )
     _parser.add_argument(
         "-o",
         "--out-file",
@@ -121,11 +144,21 @@ def create_parser(
     return _parser
 
 
+def _parse_col_list(s: str | None) -> list[str] | None:
+    if s is None:
+        return s
+    else:
+        return s.split(",")
+
+
 def handler(args: argparse.Namespace) -> int:
     in_file: TextIOWrapper = args.in_file
     has_header: bool = args.header
     delimiter: str = args.delimiter
+    pick: list[str] | None = args.crop_pick_cols
+    omit: list[str] | None = args.crop_omit_cols
     data = read_file(in_file, delimiter, has_header)
+    out_cols = _prepare_out_cols(data, pick, omit)
 
     popts = PlotOptions.from_namespace(args, data.header)
     copts = CropOptions.from_namespace(args, data.header)
@@ -133,7 +166,7 @@ def handler(args: argparse.Namespace) -> int:
 
     if copts.start is not None:
         cropped_data = crop(data, copts)
-        return write_records(cropped_data, out_file, delimiter)
+        return write_records(cropped_data, out_file, delimiter=delimiter, cols=out_cols)
     else:
         fig, ax = plot(data, popts)
         return write_figure(fig, ax, out_file)
@@ -180,6 +213,23 @@ def _determine_numeric_columns(records: list[list[Any]]) -> list[bool]:
     for record in records:
         numeric = [n and isinstance(e, (int, float)) for n, e in zip(numeric, record)]
     return numeric
+
+
+def _prepare_out_cols(
+    data: Data,
+    pick_cols: list[str] | None,
+    omit_cols: list[str] | None,
+) -> list[int] | None:
+    header = data.header or list(range(len(data.records[0])))
+    hmap = {h: i for i, h in enumerate(header)}
+
+    if pick_cols is not None:
+        return [int(c) if c.isdigit() else hmap[c] for c in pick_cols]
+    elif omit_cols is not None:
+        _omit_idx = {int(c) if c.isdigit() else hmap[c] for c in omit_cols}
+        return [i for i, _ in enumerate(header) if i not in _omit_idx]
+    else:
+        return [i for i, _ in enumerate(header)]
 
 
 class CropOptions(NamedTuple):
@@ -287,12 +337,17 @@ def _argmin(values: list[int | float]) -> int:
 def write_records(
     data: Data,
     out_file: TextIOWrapper,
+    /,
+    *,
     delimiter: str = Defaults.DELIMITER,
+    cols: list[int] | None = None,
 ) -> int:
     writer = csv.writer(out_file, delimiter=delimiter)
     if data.header is not None:
-        writer.writerow(data.header)
-    writer.writerows(data.records)
+        h = [data.header[i] for i in cols] if cols is not None else data.header
+        writer.writerow(h)
+    r = [[rec[i] for i in cols] for rec in data.records] if cols else data.records
+    writer.writerows(r)
 
     return 0
 
