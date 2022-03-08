@@ -13,7 +13,7 @@ documentation = "https://github.com/andrewrosss/snip-tsv"
 
 [tool.poetry.dependencies]
 python = "^3.8"
-matplotlib = "^3.5.1"
+matplotlib = "^3.0.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
