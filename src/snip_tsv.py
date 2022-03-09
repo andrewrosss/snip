@@ -18,7 +18,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 
 
-__version__ = "0.5.0"
+__version__ = "0.5.1"
 
 
 COL_DTYPE = {"int": int, "float": float, "str": str}
