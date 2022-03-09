@@ -382,6 +382,7 @@ def plot(data: Data, opts: PlotOptions) -> tuple[Figure, Axes]:
     x = [r[opts.x] for r in data.records]
     y = [r[opts.y] for r in data.records]
     ax.plot(x, y)
+    ax.grid(linestyle="-.", linewidth=0.5)  # type: ignore
 
     return fig, ax
 
